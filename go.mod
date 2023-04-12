@@ -16,3 +16,6 @@ require (
 	golang.org/x/net v0.0.0-20170726083632-f5079bd7f6f7 // indirect
 	golang.org/x/sys v0.0.0-20170728174421-0f826bdd13b5 // indirect
 )
+
+// use github.com/smallstep/pkcs7 fork with patches applied
+replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20230302202335-4c094085c948

@@ -37,12 +37,12 @@ type MessageType string
 // Undefined message types are treated as an error.
 const (
 	CertRep    MessageType = "3"
-	RenewalReq             = "17"
-	UpdateReq              = "18"
-	PKCSReq                = "19"
-	CertPoll               = "20"
-	GetCert                = "21"
-	GetCRL                 = "22"
+	RenewalReq MessageType = "17"
+	UpdateReq  MessageType = "18"
+	PKCSReq    MessageType = "19"
+	CertPoll   MessageType = "20"
+	GetCert    MessageType = "21"
+	GetCRL     MessageType = "22"
 )
 
 func (msg MessageType) String() string {
@@ -75,8 +75,8 @@ type PKIStatus string
 // Undefined pkiStatus attributes are treated as an error
 const (
 	SUCCESS PKIStatus = "0"
-	FAILURE           = "2"
-	PENDING           = "3"
+	FAILURE PKIStatus = "2"
+	PENDING PKIStatus = "3"
 )
 
 // FailInfo is a SCEP failInfo attribute
@@ -87,10 +87,10 @@ type FailInfo string
 
 const (
 	BadAlg          FailInfo = "0"
-	BadMessageCheck          = "1"
-	BadRequest               = "2"
-	BadTime                  = "3"
-	BadCertID                = "4"
+	BadMessageCheck FailInfo = "1"
+	BadRequest      FailInfo = "2"
+	BadTime         FailInfo = "3"
+	BadCertID       FailInfo = "4"
 )
 
 func (info FailInfo) String() string {
@@ -447,7 +447,6 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 	}
 
 	return crepMsg, nil
-
 }
 
 // Success returns a new PKIMessage with CertRep data using an already-issued certificate

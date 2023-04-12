@@ -47,7 +47,7 @@ func FingerprintCertsSelector(hashType crypto.Hash, hash []byte) CertsSelectorFu
 		for _, cert := range certs {
 			h := hashType.New()
 			h.Write(cert.Raw)
-			if bytes.Compare(hash, h.Sum(nil)) == 0 {
+			if bytes.Equal(hash, h.Sum(nil)) {
 				selected = append(selected, cert)
 				return
 			}

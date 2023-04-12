@@ -7,8 +7,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -130,6 +130,7 @@ func TestSignCSR(t *testing.T) {
 }
 
 func TestNewCSRRequest(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		testName          string
 		keyUsage          x509.KeyUsage
@@ -230,7 +231,7 @@ func newCSR(priv *rsa.PrivateKey, email, country, cname string) ([]byte, error) 
 }
 
 func loadTestFile(t *testing.T, path string) []byte {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +291,7 @@ const (
 )
 
 func loadCertFromFile(path string) (*x509.Certificate, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +308,7 @@ func loadCertFromFile(path string) (*x509.Certificate, error) {
 
 // load an encrypted private key from disk
 func loadKeyFromFile(path string) (*rsa.PrivateKey, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -323,6 +324,7 @@ func loadKeyFromFile(path string) (*rsa.PrivateKey, error) {
 	// testca key has a password
 	if len(pemBlock.Headers) > 0 {
 		password := []byte("")
+		//nolint:staticcheck // required for legacy compatibility; can be replaced with pemutil.DecryptPEMBlock() from our crypto lib
 		b, err := x509.DecryptPEMBlock(pemBlock, password)
 		if err != nil {
 			return nil, err

@@ -11,13 +11,14 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
+	"errors"
+	"fmt"
 
 	"github.com/micromdm/scep/v2/cryptoutil"
 	"github.com/micromdm/scep/v2/cryptoutil/x509util"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 	"go.mozilla.org/pkcs7"
 )
 
@@ -296,7 +297,7 @@ func (msg *PKIMessage) parseMessageType() error {
 			return err
 		}
 		if len(rn) == 0 {
-			return errors.New("scep pkiMessage must include recipientNonce attribute")
+			return errors.New("scep: pkiMessage must include recipientNonce attribute")
 		}
 		cr := &CertRepMessage{
 			PKIStatus:      status,
@@ -311,13 +312,13 @@ func (msg *PKIMessage) parseMessageType() error {
 				return err
 			}
 			if fi == "" {
-				return errors.New("scep pkiStatus FAILURE must have a failInfo attribute")
+				return errors.New("scep: pkiStatus FAILURE must have a failInfo attribute")
 			}
 			cr.FailInfo = fi
 		case PENDING:
 			break
 		default:
-			return errors.Errorf("unknown scep pkiStatus %s", status)
+			return fmt.Errorf("scep: unknown pkiStatus %s", status)
 		}
 		msg.CertRepMessage = cr
 		return nil
@@ -327,7 +328,7 @@ func (msg *PKIMessage) parseMessageType() error {
 			return err
 		}
 		if len(sn) == 0 {
-			return errors.New("scep pkiMessage must include senderNonce attribute")
+			return errors.New("scep: pkiMessage must include senderNonce attribute")
 		}
 		msg.SenderNonce = sn
 		return nil
@@ -366,12 +367,12 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	case PKCSReq, UpdateReq, RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
-			return errors.Wrap(err, "parse CSR from pkiEnvelope")
+			return fmt.Errorf("scep: parse CSR from pkiEnvelope: %w", err)
 		}
 		// check for challengePassword
 		cp, err := x509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
-			return errors.Wrap(err, "scep: parse challenge password in pkiEnvelope")
+			return fmt.Errorf("scep: parse challenge password in pkiEnvelope: %w", err)
 		}
 		msg.CSRReqMessage = &CSRReqMessage{
 			RawDecrypted:      msg.pkiEnvelope,

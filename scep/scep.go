@@ -24,8 +24,8 @@ import (
 
 // errors
 var (
-	errNotImplemented     = errors.New("not implemented")
-	errUnknownMessageType = errors.New("unknown messageType")
+	errNotImplemented     = errors.New("scep: not implemented")
+	errUnknownMessageType = errors.New("scep: unknown messageType")
 )
 
 // The MessageType attribute specifies the type of operation performed
@@ -567,9 +567,9 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	if len(recipients) < 1 {
 		if len(tmpl.Recipients) >= 1 {
 			// our certsSelector eliminated any CA/RA recipients
-			return nil, errors.New("no selected CA/RA recipients")
+			return nil, errors.New("scep: no selected CA/RA recipients")
 		}
-		return nil, errors.New("no CA/RA recipients")
+		return nil, errors.New("scep: no CA/RA recipients")
 	}
 	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {

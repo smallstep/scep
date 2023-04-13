@@ -29,7 +29,7 @@ var (
 
 var (
 	levelKey   = level.Key()
-	debugLevel = level.DebugValue()
+	levelDebug = level.DebugValue()
 )
 
 // The MessageType attribute specifies the type of operation performed
@@ -275,7 +275,7 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 	}
 
 	msg.logger.Log(
-		levelKey, debugLevel,
+		levelKey, levelDebug,
 		"msg", "parsed scep pkiMessage",
 		"scep_message_type", msgType,
 		"transaction_id", tID,
@@ -354,7 +354,7 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	}
 
 	logKeyVals := []interface{}{
-		levelKey, debugLevel,
+		levelKey, levelDebug,
 		"msg", "decrypt pkiEnvelope",
 	}
 	defer func() { msg.logger.Log(logKeyVals...) }()
@@ -597,7 +597,7 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	}
 
 	conf.logger.Log(
-		levelKey, debugLevel,
+		levelKey, levelDebug,
 		"msg", "creating SCEP CSR request",
 		"transaction_id", tID,
 		"signer_cn", tmpl.SignerCert.Subject.CommonName,

@@ -15,10 +15,10 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/micromdm/scep/v2/cryptoutil"
-	"github.com/micromdm/scep/v2/cryptoutil/x509util"
-
 	"go.mozilla.org/pkcs7"
+
+	"github.com/micromdm/scep/v2/scep/internal/cryptoutil"
+	"github.com/micromdm/scep/v2/scep/internal/x509util"
 )
 
 // errors

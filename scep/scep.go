@@ -11,20 +11,26 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
+	"errors"
+	"fmt"
 
-	"github.com/micromdm/scep/v2/cryptoutil"
-	"github.com/micromdm/scep/v2/cryptoutil/x509util"
-
-	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/pkg/errors"
 	"go.mozilla.org/pkcs7"
+
+	"github.com/micromdm/scep/v2/scep/internal/cryptoutil"
+	"github.com/micromdm/scep/v2/scep/internal/x509util"
 )
 
 // errors
 var (
-	errNotImplemented     = errors.New("not implemented")
-	errUnknownMessageType = errors.New("unknown messageType")
+	errNotImplemented     = errors.New("scep: not implemented")
+	errUnknownMessageType = errors.New("scep: unknown messageType")
+)
+
+// prepare the go-kit leveled logging configuration
+var (
+	levelKey   = level.Key()
+	levelDebug = level.DebugValue()
 )
 
 // The MessageType attribute specifies the type of operation performed
@@ -37,12 +43,12 @@ type MessageType string
 // Undefined message types are treated as an error.
 const (
 	CertRep    MessageType = "3"
-	RenewalReq             = "17"
-	UpdateReq              = "18"
-	PKCSReq                = "19"
-	CertPoll               = "20"
-	GetCert                = "21"
-	GetCRL                 = "22"
+	RenewalReq MessageType = "17"
+	UpdateReq  MessageType = "18"
+	PKCSReq    MessageType = "19"
+	CertPoll   MessageType = "20"
+	GetCert    MessageType = "21"
+	GetCRL     MessageType = "22"
 )
 
 func (msg MessageType) String() string {
@@ -75,8 +81,8 @@ type PKIStatus string
 // Undefined pkiStatus attributes are treated as an error
 const (
 	SUCCESS PKIStatus = "0"
-	FAILURE           = "2"
-	PENDING           = "3"
+	FAILURE PKIStatus = "2"
+	PENDING PKIStatus = "3"
 )
 
 // FailInfo is a SCEP failInfo attribute
@@ -87,10 +93,10 @@ type FailInfo string
 
 const (
 	BadAlg          FailInfo = "0"
-	BadMessageCheck          = "1"
-	BadRequest               = "2"
-	BadTime                  = "3"
-	BadCertID                = "4"
+	BadMessageCheck FailInfo = "1"
+	BadRequest      FailInfo = "2"
+	BadTime         FailInfo = "3"
+	BadCertID       FailInfo = "4"
 )
 
 func (info FailInfo) String() string {
@@ -136,7 +142,7 @@ var (
 )
 
 // WithLogger adds option logging to the SCEP operations.
-func WithLogger(logger log.Logger) Option {
+func WithLogger(logger Logger) Option {
 	return func(c *config) {
 		c.logger = logger
 	}
@@ -166,7 +172,7 @@ func WithCertsSelector(selector CertsSelector) Option {
 type Option func(*config)
 
 type config struct {
-	logger        log.Logger
+	logger        Logger
 	caCerts       []*x509.Certificate // specified if CA certificates have already been retrieved
 	certsSelector CertsSelector
 }
@@ -195,7 +201,7 @@ type PKIMessage struct {
 	SignerKey  *rsa.PrivateKey
 	SignerCert *x509.Certificate
 
-	logger log.Logger
+	logger Logger
 }
 
 // CertRepMessage is a type of PKIMessage
@@ -224,7 +230,7 @@ type CSRReqMessage struct {
 
 // ParsePKIMessage unmarshals a PKCS#7 signed data into a PKI message struct
 func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
-	conf := &config{logger: log.NewNopLogger()}
+	conf := &config{logger: newNopLogger()}
 	for _, opt := range opts {
 		opt(conf)
 	}
@@ -269,13 +275,12 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 		logger:        conf.logger,
 	}
 
-	// log relevant key-values when parsing a pkiMessage.
-	logKeyVals := []interface{}{
+	msg.logger.Log(
+		levelKey, levelDebug,
 		"msg", "parsed scep pkiMessage",
 		"scep_message_type", msgType,
 		"transaction_id", tID,
-	}
-	level.Debug(msg.logger).Log(logKeyVals...)
+	)
 
 	if err := msg.parseMessageType(); err != nil {
 		return nil, err
@@ -296,7 +301,7 @@ func (msg *PKIMessage) parseMessageType() error {
 			return err
 		}
 		if len(rn) == 0 {
-			return errors.New("scep pkiMessage must include recipientNonce attribute")
+			return errors.New("scep: pkiMessage must include recipientNonce attribute")
 		}
 		cr := &CertRepMessage{
 			PKIStatus:      status,
@@ -311,13 +316,13 @@ func (msg *PKIMessage) parseMessageType() error {
 				return err
 			}
 			if fi == "" {
-				return errors.New("scep pkiStatus FAILURE must have a failInfo attribute")
+				return errors.New("scep: pkiStatus FAILURE must have a failInfo attribute")
 			}
 			cr.FailInfo = fi
 		case PENDING:
 			break
 		default:
-			return errors.Errorf("unknown scep pkiStatus %s", status)
+			return fmt.Errorf("scep: unknown pkiStatus %s", status)
 		}
 		msg.CertRepMessage = cr
 		return nil
@@ -327,7 +332,7 @@ func (msg *PKIMessage) parseMessageType() error {
 			return err
 		}
 		if len(sn) == 0 {
-			return errors.New("scep pkiMessage must include senderNonce attribute")
+			return errors.New("scep: pkiMessage must include senderNonce attribute")
 		}
 		msg.SenderNonce = sn
 		return nil
@@ -350,9 +355,10 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	}
 
 	logKeyVals := []interface{}{
+		levelKey, levelDebug,
 		"msg", "decrypt pkiEnvelope",
 	}
-	defer func() { level.Debug(msg.logger).Log(logKeyVals...) }()
+	defer func() { msg.logger.Log(logKeyVals...) }()
 
 	switch msg.MessageType {
 	case CertRep:
@@ -366,12 +372,12 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	case PKCSReq, UpdateReq, RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
-			return errors.Wrap(err, "parse CSR from pkiEnvelope")
+			return fmt.Errorf("scep: parse CSR from pkiEnvelope: %w", err)
 		}
 		// check for challengePassword
 		cp, err := x509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
-			return errors.Wrap(err, "scep: parse challenge password in pkiEnvelope")
+			return fmt.Errorf("scep: parse challenge password in pkiEnvelope: %w", err)
 		}
 		msg.CSRReqMessage = &CSRReqMessage{
 			RawDecrypted:      msg.pkiEnvelope,
@@ -447,7 +453,6 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 	}
 
 	return crepMsg, nil
-
 }
 
 // Success returns a new PKIMessage with CertRep data using an already-issued certificate
@@ -557,7 +562,7 @@ func CACerts(data []byte) ([]*x509.Certificate, error) {
 
 // NewCSRRequest creates a scep PKI PKCSReq/UpdateReq message
 func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Option) (*PKIMessage, error) {
-	conf := &config{logger: log.NewNopLogger(), certsSelector: NopCertsSelector()}
+	conf := &config{logger: newNopLogger(), certsSelector: NopCertsSelector()}
 	for _, opt := range opts {
 		opt(conf)
 	}
@@ -567,9 +572,9 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	if len(recipients) < 1 {
 		if len(tmpl.Recipients) >= 1 {
 			// our certsSelector eliminated any CA/RA recipients
-			return nil, errors.New("no selected CA/RA recipients")
+			return nil, errors.New("scep: no selected CA/RA recipients")
 		}
-		return nil, errors.New("no CA/RA recipients")
+		return nil, errors.New("scep: no CA/RA recipients")
 	}
 	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {
@@ -592,7 +597,8 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 		return nil, err
 	}
 
-	level.Debug(conf.logger).Log(
+	conf.logger.Log(
+		levelKey, levelDebug,
 		"msg", "creating SCEP CSR request",
 		"transaction_id", tID,
 		"signer_cn", tmpl.SignerCert.Subject.CommonName,

@@ -9,6 +9,8 @@ import (
 )
 
 func TestFingerprintCertsSelector(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range []struct {
 		testName      string
 		hashType      crypto.Hash
@@ -43,7 +45,6 @@ func TestFingerprintCertsSelector(t *testing.T) {
 			t.Parallel()
 
 			fakeCerts := []*x509.Certificate{{Raw: test.certRaw}}
-
 			hash, err := hex.DecodeString(test.hash)
 			if err != nil {
 				t.Fatal(err)
@@ -62,6 +63,8 @@ func TestFingerprintCertsSelector(t *testing.T) {
 }
 
 func TestEnciphermentCertsSelector(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range []struct {
 		testName              string
 		certs                 []*x509.Certificate
@@ -101,6 +104,8 @@ func TestEnciphermentCertsSelector(t *testing.T) {
 }
 
 func TestNopCertsSelector(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range []struct {
 		testName              string
 		certs                 []*x509.Certificate
@@ -143,7 +148,7 @@ func TestNopCertsSelector(t *testing.T) {
 
 // certsKeyUsagesEq returns true if certs in a have the same key usages
 // of certs in b and in the same order.
-func certsKeyUsagesEq(a []*x509.Certificate, b []*x509.Certificate) bool {
+func certsKeyUsagesEq(a, b []*x509.Certificate) bool {
 	if len(a) != len(b) {
 		return false
 	}

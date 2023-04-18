@@ -27,6 +27,7 @@ var (
 	errUnknownMessageType = errors.New("scep: unknown messageType")
 )
 
+// prepare the go-kit leveled logging configuration
 var (
 	levelKey   = level.Key()
 	levelDebug = level.DebugValue()

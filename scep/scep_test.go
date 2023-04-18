@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -59,8 +60,8 @@ func validateParsedPKIMessage(t *testing.T, msg *scep.PKIMessage) {
 // certificates assuming that the client can request CA certificates using
 // GetCaCert request.
 func TestParsePKIEnvelopeCert_MissingCertificatesForSigners(t *testing.T) {
-	certRepMissingCertificates := readFile(t, "testdata/testca2/CertRep_NoCertificatesForSigners.der")
-	caPEM := readFile(t, "testdata/testca2/ca2.pem")
+	certRepMissingCertificates := readTestFile(t, "testca2/CertRep_NoCertificatesForSigners.der")
+	caPEM := readTestFile(t, "testca2/ca2.pem")
 
 	// Try to parse the PKIMessage without providing certificates for signers.
 	_, err := scep.ParsePKIMessage(certRepMissingCertificates)
@@ -78,7 +79,7 @@ func TestParsePKIEnvelopeCert_MissingCertificatesForSigners(t *testing.T) {
 }
 
 func TestDecryptPKIEnvelopeCSR(t *testing.T) {
-	pkcsReq := readFile(t, "testdata/PKCSReq.der")
+	pkcsReq := readTestFile(t, "PKCSReq.der")
 	msg := testParsePKIMessage(t, pkcsReq)
 	cacert, cakey := loadCACredentials(t)
 	err := msg.DecryptPKIEnvelope(cacert, cakey)
@@ -91,7 +92,7 @@ func TestDecryptPKIEnvelopeCSR(t *testing.T) {
 }
 
 func TestDecryptPKIEnvelopeCert(t *testing.T) {
-	certRep := readFile(t, "testdata/CertRep.der")
+	certRep := readTestFile(t, "CertRep.der")
 	testParsePKIMessage(t, certRep)
 	// clientcert, clientkey := loadClientCredentials(t)
 	// err = msg.DecryptPKIEnvelope(clientcert, clientkey)
@@ -101,7 +102,7 @@ func TestDecryptPKIEnvelopeCert(t *testing.T) {
 }
 
 func TestSignCSR(t *testing.T) {
-	pkcsReq := readFile(t, "testdata/PKCSReq.der")
+	pkcsReq := readTestFile(t, "PKCSReq.der")
 	msg := testParsePKIMessage(t, pkcsReq)
 	cacert, cakey := loadCACredentials(t)
 	err := msg.DecryptPKIEnvelope(cacert, cakey)
@@ -247,10 +248,10 @@ func newCSR(t *testing.T, priv *rsa.PrivateKey, email, country, cname string) []
 	return der
 }
 
-func readFile(t *testing.T, path string) []byte {
+func readTestFile(t *testing.T, filepath string) []byte {
 	t.Helper()
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path.Join("testdata", filepath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,16 +286,16 @@ func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certi
 func loadCACredentials(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
 	t.Helper()
 
-	cert := loadCertFromFile(t, "testdata/testca/ca.crt")
-	key := loadKeyFromFile(t, "testdata/testca/ca.key")
+	cert := loadCertFromFile(t, "testca/ca.crt")
+	key := loadKeyFromFile(t, "testca/ca.key")
 	return cert, key
 }
 
 func loadClientCredentials(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
 	t.Helper()
 
-	cert := loadCertFromFile(t, "testdata/testclient/client.pem")
-	key := loadKeyFromFile(t, "testdata/testclient/client.key")
+	cert := loadCertFromFile(t, "testclient/client.pem")
+	key := loadKeyFromFile(t, "testclient/client.key")
 	return cert, key
 }
 
@@ -303,16 +304,16 @@ const (
 	certificatePEMBlockType   = "CERTIFICATE"
 )
 
-func loadCertFromFile(t *testing.T, path string) *x509.Certificate {
+func loadCertFromFile(t *testing.T, filepath string) *x509.Certificate {
 	t.Helper()
 
-	data := readFile(t, path)
+	data := readTestFile(t, filepath)
 	pemBlock, _ := pem.Decode(data)
 	if pemBlock == nil {
-		t.Fatal(fmt.Errorf("PEM decode failed for %q", path))
+		t.Fatal(fmt.Errorf("PEM decode failed for %q", filepath))
 	}
 	if pemBlock.Type != certificatePEMBlockType {
-		t.Fatal(fmt.Errorf("unmatched type or headers in %q", path))
+		t.Fatal(fmt.Errorf("unmatched type or headers in %q", filepath))
 	}
 	der, err := x509.ParseCertificate(pemBlock.Bytes)
 	if err != nil {
@@ -322,16 +323,16 @@ func loadCertFromFile(t *testing.T, path string) *x509.Certificate {
 }
 
 // load an encrypted private key from disk
-func loadKeyFromFile(t *testing.T, path string) *rsa.PrivateKey {
+func loadKeyFromFile(t *testing.T, filepath string) *rsa.PrivateKey {
 	t.Helper()
 
-	data := readFile(t, path)
+	data := readTestFile(t, filepath)
 	pemBlock, _ := pem.Decode(data)
 	if pemBlock == nil {
-		t.Fatal(fmt.Errorf("PEM decode failed for %q", path))
+		t.Fatal(fmt.Errorf("PEM decode failed for %q", filepath))
 	}
 	if pemBlock.Type != rsaPrivateKeyPEMBlockType {
-		t.Fatal(fmt.Errorf("unmatched type or headers in %q", path))
+		t.Fatal(fmt.Errorf("unmatched type or headers in %q", filepath))
 	}
 
 	// testca key has a password

@@ -17,8 +17,8 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"go.mozilla.org/pkcs7"
 
-	"github.com/micromdm/scep/v2/scep/cryptoutil"
-	"github.com/micromdm/scep/v2/scep/x509util"
+	"github.com/micromdm/scep/v2/cryptoutil"
+	"github.com/micromdm/scep/v2/x509util"
 )
 
 // errors

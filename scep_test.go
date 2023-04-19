@@ -17,7 +17,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
-	"github.com/micromdm/scep/v2/cryptoutil"
+	"github.com/smallstep/scep/v3/cryptoutil"
 )
 
 func testParsePKIMessage(t *testing.T, data []byte) *PKIMessage {

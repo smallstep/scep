@@ -16,9 +16,9 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/micromdm/scep/v2/cryptoutil"
-	"github.com/micromdm/scep/v2/depot"
+
 	"github.com/micromdm/scep/v2/scep"
+	"github.com/micromdm/scep/v2/scep/cryptoutil"
 )
 
 func testParsePKIMessage(t *testing.T, data []byte) *scep.PKIMessage {
@@ -266,13 +266,30 @@ func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certi
 	if err != nil {
 		t.Fatal(err)
 	}
-	caCert := depot.NewCACert(
-		depot.WithCountry("US"),
-		depot.WithOrganization("MICROMDM"),
-		depot.WithCommonName("MICROMDM SCEP CA"),
-		depot.WithKeyUsage(keyUsage),
-	)
-	crtBytes, err := caCert.SelfSign(rand.Reader, &key.PublicKey, key)
+
+	// NOTE: this uses SHA256 instead of the SHA1 specified in RFC5280
+	subjKeyId, err := cryptoutil.GenerateSubjectKeyID(key.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	template := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   "MICROMDM SCEP CA",
+			Country:      []string{"US"},
+			Organization: []string{"MICROMDM"},
+		},
+		SerialNumber:          big.NewInt(1),
+		KeyUsage:              keyUsage,
+		NotBefore:             time.Now().Add(-600).UTC(),
+		NotAfter:              time.Now().AddDate(1, 0, 0).UTC(), // + 1 year
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		MaxPathLen:            0,
+		SubjectKeyId:          subjKeyId,
+	}
+
+	crtBytes, err := x509.CreateCertificate(rand.Reader, template, template, key.Public(), key)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-module github.com/smallstep/scep/v2
+module github.com/smallstep/scep
 
 go 1.16
 

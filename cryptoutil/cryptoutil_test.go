@@ -4,22 +4,35 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/rsa"
-	"math/big"
 	"testing"
 )
 
 func TestGenerateSubjectKeyID(t *testing.T) {
+	t.Parallel()
+
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ecdsaKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for _, test := range []struct {
 		testName string
 		pub      crypto.PublicKey
 	}{
-		{"RSA", &rsa.PublicKey{N: big.NewInt(123), E: 65537}},
-		{"ECDSA", &ecdsa.PublicKey{X: big.NewInt(123), Y: big.NewInt(123), Curve: elliptic.P224()}},
+		{"RSA", rsaKey.Public()},
+		{"ECDSA", &ecdsaKey.PublicKey},
 	} {
 		test := test
 		t.Run(test.testName, func(t *testing.T) {
 			t.Parallel()
+
 			ski, err := GenerateSubjectKeyID(test.pub)
 			if err != nil {
 				t.Fatal(err)

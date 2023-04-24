@@ -1,4 +1,4 @@
-package scep_test
+package scep
 
 import (
 	"crypto/rand"
@@ -16,17 +16,16 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/micromdm/scep/v2/cryptoutil"
-	"github.com/micromdm/scep/v2/depot"
-	"github.com/micromdm/scep/v2/scep"
+
+	"github.com/smallstep/scep/cryptoutil"
 )
 
-func testParsePKIMessage(t *testing.T, data []byte) *scep.PKIMessage {
+func testParsePKIMessage(t *testing.T, data []byte) *PKIMessage {
 	t.Helper()
 
 	logger := log.NewLogfmtLogger(os.Stderr)
 	logger = level.NewFilter(logger, level.AllowDebug())
-	msg, err := scep.ParsePKIMessage(data, scep.WithLogger(logger))
+	msg, err := ParsePKIMessage(data, WithLogger(logger))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +34,7 @@ func testParsePKIMessage(t *testing.T, data []byte) *scep.PKIMessage {
 	return msg
 }
 
-func validateParsedPKIMessage(t *testing.T, msg *scep.PKIMessage) {
+func validateParsedPKIMessage(t *testing.T, msg *PKIMessage) {
 	t.Helper()
 
 	if msg.TransactionID == "" {
@@ -45,11 +44,11 @@ func validateParsedPKIMessage(t *testing.T, msg *scep.PKIMessage) {
 		t.Errorf("expected MessageType attribute")
 	}
 	switch msg.MessageType {
-	case scep.CertRep:
+	case CertRep:
 		if len(msg.RecipientNonce) == 0 {
 			t.Errorf("expected RecipientNonce attribute")
 		}
-	case scep.PKCSReq, scep.UpdateReq, scep.RenewalReq:
+	case PKCSReq, UpdateReq, RenewalReq:
 		if len(msg.SenderNonce) == 0 {
 			t.Errorf("expected SenderNonce attribute")
 		}
@@ -64,13 +63,13 @@ func TestParsePKIEnvelopeCert_MissingCertificatesForSigners(t *testing.T) {
 	caPEM := readTestFile(t, "testca2/ca2.pem")
 
 	// Try to parse the PKIMessage without providing certificates for signers.
-	_, err := scep.ParsePKIMessage(certRepMissingCertificates)
+	_, err := ParsePKIMessage(certRepMissingCertificates)
 	if err == nil {
 		t.Fatal("parsed PKIMessage without providing signer certificates")
 	}
 
 	signerCert := decodePEMCert(t, caPEM)
-	msg, err := scep.ParsePKIMessage(certRepMissingCertificates, scep.WithCACerts([]*x509.Certificate{signerCert}))
+	msg, err := ParsePKIMessage(certRepMissingCertificates, WithCACerts([]*x509.Certificate{signerCert}))
 	if err != nil {
 		t.Fatalf("failed to parse PKIMessage: %v", err)
 	}
@@ -149,31 +148,31 @@ func TestNewCSRRequest(t *testing.T) {
 	for _, test := range []struct {
 		testName          string
 		keyUsage          x509.KeyUsage
-		certsSelectorFunc scep.CertsSelectorFunc
+		certsSelectorFunc CertsSelectorFunc
 		shouldCreateCSR   bool
 	}{
 		{
 			"KeyEncipherment not set with NOP certificates selector",
 			x509.KeyUsageCertSign,
-			scep.NopCertsSelector(),
+			NopCertsSelector(),
 			true,
 		},
 		{
 			"KeyEncipherment is set with NOP certificates selector",
 			x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
-			scep.NopCertsSelector(),
+			NopCertsSelector(),
 			true,
 		},
 		{
 			"KeyEncipherment not set with Encipherment certificates selector",
 			x509.KeyUsageCertSign,
-			scep.EnciphermentCertsSelector(),
+			EnciphermentCertsSelector(),
 			false,
 		},
 		{
 			"KeyEncipherment is set with Encipherment certificates selector",
 			x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
-			scep.EnciphermentCertsSelector(),
+			EnciphermentCertsSelector(),
 			true,
 		},
 	} {
@@ -182,21 +181,21 @@ func TestNewCSRRequest(t *testing.T) {
 			t.Parallel()
 
 			key := newRSAKey(t, 2048)
-			derBytes := newCSR(t, key, "john.doe@example.com", "US", "com.apple.scep.2379B935-294B-4AF1-A213-9BD44A2C6688")
+			derBytes := newCSR(t, key, "john.doe@example.com", "US", "com.apple.2379B935-294B-4AF1-A213-9BD44A2C6688")
 			csr, err := x509.ParseCertificateRequest(derBytes)
 			if err != nil {
 				t.Fatal(err)
 			}
 			clientcert, clientkey := loadClientCredentials(t)
 			cacert, cakey := createCaCertWithKeyUsage(t, test.keyUsage)
-			tmpl := &scep.PKIMessage{
-				MessageType: scep.PKCSReq,
+			tmpl := &PKIMessage{
+				MessageType: PKCSReq,
 				Recipients:  []*x509.Certificate{cacert},
 				SignerCert:  clientcert,
 				SignerKey:   clientkey,
 			}
 
-			pkcsreq, err := scep.NewCSRRequest(csr, tmpl, scep.WithCertsSelector(test.certsSelectorFunc))
+			pkcsreq, err := NewCSRRequest(csr, tmpl, WithCertsSelector(test.certsSelectorFunc))
 			if test.shouldCreateCSR && err != nil {
 				t.Fatalf("keyUsage: %d, failed creating a CSR request: %v", test.keyUsage, err)
 			}
@@ -266,13 +265,30 @@ func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certi
 	if err != nil {
 		t.Fatal(err)
 	}
-	caCert := depot.NewCACert(
-		depot.WithCountry("US"),
-		depot.WithOrganization("MICROMDM"),
-		depot.WithCommonName("MICROMDM SCEP CA"),
-		depot.WithKeyUsage(keyUsage),
-	)
-	crtBytes, err := caCert.SelfSign(rand.Reader, &key.PublicKey, key)
+
+	// NOTE: this uses SHA256 instead of the SHA1 specified in RFC5280
+	subjKeyID, err := cryptoutil.GenerateSubjectKeyID(key.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	template := &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName:   "MICROMDM SCEP CA",
+			Country:      []string{"US"},
+			Organization: []string{"MICROMDM"},
+		},
+		SerialNumber:          big.NewInt(1),
+		KeyUsage:              keyUsage,
+		NotBefore:             time.Now().Add(-600).UTC(),
+		NotAfter:              time.Now().AddDate(1, 0, 0).UTC(), // + 1 year
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		MaxPathLen:            0,
+		SubjectKeyId:          subjKeyID,
+	}
+
+	crtBytes, err := x509.CreateCertificate(rand.Reader, template, template, key.Public(), key)
 	if err != nil {
 		t.Fatal(err)
 	}

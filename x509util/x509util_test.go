@@ -25,7 +25,7 @@ func TestCreateCertificateRequest(t *testing.T) {
 		ChallengePassword: "foobar",
 	}
 
-	derBytes, err := createCertificateRequest(r, &template, priv)
+	derBytes, err := CreateCertificateRequest(r, &template, priv)
 	if err != nil {
 		t.Fatal(err)
 	}

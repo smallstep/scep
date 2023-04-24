@@ -50,12 +50,12 @@ type CertificateRequest struct {
 	ChallengePassword string
 }
 
-// createCertificateRequest creates a new certificate request based on a template.
+// CreateCertificateRequest creates a new certificate request based on a template.
 // The resulting CSR is similar to x509 but optionally supports the
 // challengePassword attribute.
 //
 // See https://github.com/golang/go/issues/15995
-func createCertificateRequest(rand io.Reader, template *CertificateRequest, priv interface{}) (csr []byte, err error) {
+func CreateCertificateRequest(rand io.Reader, template *CertificateRequest, priv interface{}) (csr []byte, err error) {
 	if template.ChallengePassword == "" {
 		// if no challenge password, return a stdlib CSR.
 		return x509.CreateCertificateRequest(rand, &template.CertificateRequest, priv)

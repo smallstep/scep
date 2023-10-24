@@ -15,7 +15,7 @@ import (
 	"fmt"
 
 	"github.com/go-kit/kit/log/level"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
 
 	"github.com/smallstep/scep/cryptoutil"
 	"github.com/smallstep/scep/x509util"

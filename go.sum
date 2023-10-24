@@ -4,5 +4,5 @@ github.com/go-logfmt/logfmt v0.5.1 h1:otpy5pqBCBZ1ng9RQ0dPu4PN7ba75Y/aA+UpowDyNV
 github.com/go-logfmt/logfmt v0.5.1/go.mod h1:WYhtIu8zTZfxdn5+rREduYbwxfcBr/Vr6KEVveWlfTs=
 github.com/go-stack/stack v1.6.0 h1:MmJCxYVKTJ0SplGKqFVX3SBnmaUhODHZrrFF6jMbpZk=
 github.com/go-stack/stack v1.6.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
-github.com/smallstep/pkcs7 v0.0.0-20230615175518-7ce6486b74eb h1:wWc8z37baPz2oyusY9BVuM+uPtq6XAOb7qSegevnRs0=
-github.com/smallstep/pkcs7 v0.0.0-20230615175518-7ce6486b74eb/go.mod h1:SNgMg+EgDFwmvSmLRTNKC5fegJjB7v23qTQ0XLGUNHk=
+github.com/smallstep/pkcs7 v0.0.0-20231024181729-3b98ecc1ca81 h1:B6cED3iLJTgxpdh4tuqByDjRRKan2EvtnOfHr2zHJVg=
+github.com/smallstep/pkcs7 v0.0.0-20231024181729-3b98ecc1ca81/go.mod h1:SoUAr/4M46rZ3WaLstHxGhLEgoYIDRqxQEXLOmOEB0Y=

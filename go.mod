@@ -1,6 +1,6 @@
 module github.com/smallstep/scep
 
-go 1.20
+go 1.16
 
 require (
 	github.com/go-kit/kit v0.4.0

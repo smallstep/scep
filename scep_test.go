@@ -121,8 +121,8 @@ func (d *nonRSADecrypter) Public() crypto.PublicKey {
 	return struct{}{}
 }
 
-func (d *nonRSADecrypter) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
-	return nil, nil
+func (d *nonRSADecrypter) Decrypt(_ io.Reader, _ []byte, _ crypto.DecrypterOpts) (plaintext []byte, err error) {
+	return nil, errors.New("not implemented")
 }
 
 func TestDecryptPKIEnvelopeCert(t *testing.T) {

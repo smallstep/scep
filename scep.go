@@ -344,7 +344,17 @@ func (msg *PKIMessage) parseMessageType() error {
 }
 
 // DecryptPKIEnvelope decrypts the pkcs envelopedData inside the SCEP PKIMessage
-func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.PrivateKey) error {
+func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key crypto.Decrypter) error {
+	if cert == nil {
+		return errors.New("scep: cert must not be nil")
+	}
+	if key == nil {
+		return errors.New("scep: key must not be nil")
+	}
+	if _, ok := key.Public().(*rsa.PublicKey); !ok {
+		return fmt.Errorf("scep: key.Public() returned type %T; expected *rsa.PublicKey", key.Public())
+	}
+
 	p7, err := pkcs7.Parse(msg.p7.Content)
 	if err != nil {
 		return err

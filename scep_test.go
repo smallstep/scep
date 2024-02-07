@@ -1,6 +1,7 @@
 package scep
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -8,6 +9,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"path"
@@ -88,6 +90,33 @@ func TestDecryptPKIEnvelopeCSR(t *testing.T) {
 	if msg.CSRReqMessage.CSR == nil {
 		t.Errorf("expected non-nil CSR field")
 	}
+}
+
+func TestDecryptPKIEnvelopeDecrypter(t *testing.T) {
+	pkcsReq := readTestFile(t, "PKCSReq.der")
+	msg := testParsePKIMessage(t, pkcsReq)
+	cacert, cakey := loadCACredentials(t)
+	if err := msg.DecryptPKIEnvelope(nil, cakey); err == nil {
+		t.Fatal("expected error on nil cert")
+	}
+
+	if err := msg.DecryptPKIEnvelope(cacert, nil); err == nil {
+		t.Fatal("expected error on nil key")
+	}
+
+	if err := msg.DecryptPKIEnvelope(cacert, &fakeDecrypter{}); err == nil {
+		t.Fatal("expected error on invalid decrypter")
+	}
+}
+
+type fakeDecrypter struct{}
+
+func (f *fakeDecrypter) Public() crypto.PublicKey {
+	return struct{}{}
+}
+
+func (f *fakeDecrypter) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
+	return nil, nil
 }
 
 func TestDecryptPKIEnvelopeCert(t *testing.T) {

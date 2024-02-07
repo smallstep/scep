@@ -198,7 +198,7 @@ type PKIMessage struct {
 	Recipients []*x509.Certificate
 
 	// Signer info
-	SignerKey  *rsa.PrivateKey
+	SignerKey  crypto.PrivateKey
 	SignerCert *x509.Certificate
 
 	logger Logger

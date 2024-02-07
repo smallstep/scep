@@ -104,18 +104,24 @@ func TestDecryptPKIEnvelopeDecrypter(t *testing.T) {
 		t.Fatal("expected error on nil key")
 	}
 
-	if err := msg.DecryptPKIEnvelope(cacert, &fakeDecrypter{}); err == nil {
+	if err := msg.DecryptPKIEnvelope(cacert, &notADecrypter{}); err == nil {
 		t.Fatal("expected error on invalid decrypter")
+	}
+
+	if err := msg.DecryptPKIEnvelope(cacert, &nonRSADecrypter{}); err == nil {
+		t.Fatal("expected error on non-RSA decrypter")
 	}
 }
 
-type fakeDecrypter struct{}
+type notADecrypter struct{}
 
-func (f *fakeDecrypter) Public() crypto.PublicKey {
+type nonRSADecrypter struct{}
+
+func (d *nonRSADecrypter) Public() crypto.PublicKey {
 	return struct{}{}
 }
 
-func (f *fakeDecrypter) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
+func (d *nonRSADecrypter) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
 	return nil, nil
 }
 

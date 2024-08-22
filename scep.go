@@ -486,6 +486,7 @@ func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth crypto.Private
 	}
 
 	// encrypt degenerate data using the original messages recipients
+  pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES128CBC // Default is DES-CBC
 	e7, err := pkcs7.Encrypt(deg, msg.p7.Certificates)
 	if err != nil {
 		return nil, err
@@ -591,6 +592,8 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 		}
 		return nil, errors.New("scep: no CA/RA recipients")
 	}
+
+  pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES128CBC // Default is DES-CBC
 	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {
 		return nil, err

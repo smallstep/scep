@@ -1,4 +1,4 @@
-package scep
+package scep_test
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"os"
 	"path"
@@ -19,23 +20,44 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
-
+	"github.com/smallstep/scep"
 	"github.com/smallstep/scep/cryptoutil"
 )
 
+type testLogger struct {
+	l *log.Logger
+}
+
+func (l *testLogger) Log(keyValues ...interface{}) error {
+	if len(keyValues)%2 != 0 {
+		return fmt.Errorf("uneven number of key-values provided: %d", len(keyValues))
+	}
+
+	line := "level=debug"
+
+	for i := 0; i < len(keyValues); i += 2 {
+		line += " " + fmt.Sprintf("%s=%s", keyValues[i], keyValues[i+1])
+	}
+
+	l.l.Println(line)
+
+	return nil
+}
+
+func newTestLogger(w io.Writer) *testLogger {
+	return &testLogger{
+		l: log.New(w, "", log.LstdFlags),
+	}
+}
+
 var newLines = regexp.MustCompile("\r?\n")
 
-func testParsePKIMessage(t *testing.T, data []byte) *PKIMessage {
+func testParsePKIMessage(t *testing.T, data []byte) *scep.PKIMessage {
 	t.Helper()
 
 	buf := bytes.Buffer{}
-	logger := log.NewLogfmtLogger(&buf)
-	logger = level.NewFilter(logger, level.AllowDebug())
-	logger = level.NewInjector(logger, level.DebugValue())
-
-	msg, err := ParsePKIMessage(data, WithLogger(logger))
+	logger := newTestLogger(&buf)
+	msg, err := scep.ParsePKIMessage(data, scep.WithLogger(logger))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +73,7 @@ func testParsePKIMessage(t *testing.T, data []byte) *PKIMessage {
 	return msg
 }
 
-func validateParsedPKIMessage(t *testing.T, msg *PKIMessage) {
+func validateParsedPKIMessage(t *testing.T, msg *scep.PKIMessage) {
 	t.Helper()
 
 	if msg.TransactionID == "" {
@@ -61,11 +83,11 @@ func validateParsedPKIMessage(t *testing.T, msg *PKIMessage) {
 		t.Errorf("expected MessageType attribute")
 	}
 	switch msg.MessageType {
-	case CertRep:
+	case scep.CertRep:
 		if len(msg.RecipientNonce) == 0 {
 			t.Errorf("expected RecipientNonce attribute")
 		}
-	case PKCSReq, UpdateReq, RenewalReq:
+	case scep.PKCSReq, scep.UpdateReq, scep.RenewalReq:
 		if len(msg.SenderNonce) == 0 {
 			t.Errorf("expected SenderNonce attribute")
 		}
@@ -113,13 +135,13 @@ func TestParsePKIEnvelopeCert_MissingCertificatesForSigners(t *testing.T) {
 	caPEM := readTestFile(t, "testca2/ca2.pem")
 
 	// Try to parse the PKIMessage without providing certificates for signers.
-	_, err := ParsePKIMessage(certRepMissingCertificates)
+	_, err := scep.ParsePKIMessage(certRepMissingCertificates)
 	if err == nil {
 		t.Fatal("parsed PKIMessage without providing signer certificates")
 	}
 
 	signerCert := decodePEMCert(t, caPEM)
-	msg, err := ParsePKIMessage(certRepMissingCertificates, WithCACerts([]*x509.Certificate{signerCert}))
+	msg, err := scep.ParsePKIMessage(certRepMissingCertificates, scep.WithCACerts([]*x509.Certificate{signerCert}))
 	if err != nil {
 		t.Fatalf("failed to parse PKIMessage: %v", err)
 	}
@@ -231,31 +253,31 @@ func TestNewCSRRequest(t *testing.T) {
 	for _, test := range []struct {
 		testName          string
 		keyUsage          x509.KeyUsage
-		certsSelectorFunc CertsSelectorFunc
+		certsSelectorFunc scep.CertsSelectorFunc
 		shouldCreateCSR   bool
 	}{
 		{
 			"KeyEncipherment not set with NOP certificates selector",
 			x509.KeyUsageCertSign,
-			NopCertsSelector(),
+			scep.NopCertsSelector(),
 			true,
 		},
 		{
 			"KeyEncipherment is set with NOP certificates selector",
 			x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
-			NopCertsSelector(),
+			scep.NopCertsSelector(),
 			true,
 		},
 		{
 			"KeyEncipherment not set with Encipherment certificates selector",
 			x509.KeyUsageCertSign,
-			EnciphermentCertsSelector(),
+			scep.EnciphermentCertsSelector(),
 			false,
 		},
 		{
 			"KeyEncipherment is set with Encipherment certificates selector",
 			x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
-			EnciphermentCertsSelector(),
+			scep.EnciphermentCertsSelector(),
 			true,
 		},
 	} {
@@ -271,19 +293,16 @@ func TestNewCSRRequest(t *testing.T) {
 			}
 			clientcert, clientkey := loadClientCredentials(t)
 			cacert, cakey := createCaCertWithKeyUsage(t, test.keyUsage)
-			tmpl := &PKIMessage{
-				MessageType: PKCSReq,
+			tmpl := &scep.PKIMessage{
+				MessageType: scep.PKCSReq,
 				Recipients:  []*x509.Certificate{cacert},
 				SignerCert:  clientcert,
 				SignerKey:   clientkey,
 			}
 
 			buf := bytes.Buffer{}
-			logger := log.NewLogfmtLogger(&buf)
-			logger = level.NewFilter(logger, level.AllowDebug())
-			logger = level.NewInjector(logger, level.DebugValue())
-
-			pkcsreq, err := NewCSRRequest(csr, tmpl, WithCertsSelector(test.certsSelectorFunc), WithLogger(logger))
+			logger := newTestLogger(&buf)
+			pkcsreq, err := scep.NewCSRRequest(csr, tmpl, scep.WithCertsSelector(test.certsSelectorFunc), scep.WithLogger(logger))
 			if test.shouldCreateCSR && err != nil {
 				t.Fatalf("keyUsage: %d, failed creating a CSR request: %v", test.keyUsage, err)
 			}

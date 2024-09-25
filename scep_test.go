@@ -16,17 +16,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-
 	"github.com/smallstep/scep/cryptoutil"
 )
 
 func testParsePKIMessage(t *testing.T, data []byte) *PKIMessage {
 	t.Helper()
 
-	logger := log.NewLogfmtLogger(os.Stderr)
-	logger = level.NewFilter(logger, level.AllowDebug())
+	logger := newNopLogger()
 	msg, err := ParsePKIMessage(data, WithLogger(logger))
 	if err != nil {
 		t.Fatal(err)

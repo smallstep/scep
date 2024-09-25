@@ -14,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/smallstep/pkcs7"
 
 	"github.com/smallstep/scep/cryptoutil"
@@ -25,12 +24,6 @@ import (
 var (
 	errNotImplemented     = errors.New("scep: not implemented")
 	errUnknownMessageType = errors.New("scep: unknown messageType")
-)
-
-// prepare the go-kit leveled logging configuration
-var (
-	levelKey   = level.Key()
-	levelDebug = level.DebugValue()
 )
 
 // The MessageType attribute specifies the type of operation performed
@@ -276,7 +269,6 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 	}
 
 	msg.logger.Log(
-		levelKey, levelDebug,
 		"msg", "parsed scep pkiMessage",
 		"scep_message_type", msgType,
 		"transaction_id", tID,
@@ -369,7 +361,6 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key crypto.Pri
 	}
 
 	logKeyVals := []interface{}{
-		levelKey, levelDebug,
 		"msg", "decrypt pkiEnvelope",
 	}
 	defer func() { msg.logger.Log(logKeyVals...) }()
@@ -613,7 +604,6 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	}
 
 	conf.logger.Log(
-		levelKey, levelDebug,
 		"msg", "creating SCEP CSR request",
 		"transaction_id", tID,
 		"signer_cn", tmpl.SignerCert.Subject.CommonName,

@@ -1,6 +1,7 @@
 package scep
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -13,26 +14,40 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 
 	"github.com/smallstep/scep/cryptoutil"
 )
 
+var newLines = regexp.MustCompile("\r?\n")
+
 func testParsePKIMessage(t *testing.T, data []byte) *PKIMessage {
 	t.Helper()
 
-	logger := log.NewLogfmtLogger(os.Stderr)
+	buf := bytes.Buffer{}
+	logger := log.NewLogfmtLogger(&buf)
 	logger = level.NewFilter(logger, level.AllowDebug())
+	logger = level.NewInjector(logger, level.DebugValue())
+
 	msg, err := ParsePKIMessage(data, WithLogger(logger))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	validateParsedPKIMessage(t, msg)
+
+	lines := newLines.Split(strings.TrimSpace(buf.String()), -1)
+	if len(lines) != 1 {
+		t.Errorf("expected single log line")
+	}
+	validateLogLevelDebug(t, lines)
+
 	return msg
 }
 
@@ -53,6 +68,39 @@ func validateParsedPKIMessage(t *testing.T, msg *PKIMessage) {
 	case PKCSReq, UpdateReq, RenewalReq:
 		if len(msg.SenderNonce) == 0 {
 			t.Errorf("expected SenderNonce attribute")
+		}
+	}
+}
+
+// textAttrs captures all key=value pairs produced the go-kit logger
+var textAttrs = regexp.MustCompile(`(\w+(?:\.\w+)*)=("(?:\\"|[^"])*"|\[.*?\]|[^ ]+)`)
+
+// splitTextAttrs splits the input string into key=value pairs. Every pair is
+// returned as a single string.
+func splitTextAttrs(input string) []string {
+	return textAttrs.FindAllString(input, -1)
+}
+
+// validateLogLevelDebug validates the input string has the debug level
+// set on each non-empty line.
+func validateLogLevelDebug(t *testing.T, lines []string) {
+	t.Helper()
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		attrs := splitTextAttrs(line)
+		countLogLevel := 0
+		for _, a := range attrs {
+			if a == "level=debug" {
+				countLogLevel += 1
+			}
+		}
+
+		if countLogLevel != 1 {
+			t.Errorf("expected log level debug to be set once; found %d occurrences", countLogLevel)
 		}
 	}
 }
@@ -230,7 +278,12 @@ func TestNewCSRRequest(t *testing.T) {
 				SignerKey:   clientkey,
 			}
 
-			pkcsreq, err := NewCSRRequest(csr, tmpl, WithCertsSelector(test.certsSelectorFunc))
+			buf := bytes.Buffer{}
+			logger := log.NewLogfmtLogger(&buf)
+			logger = level.NewFilter(logger, level.AllowDebug())
+			logger = level.NewInjector(logger, level.DebugValue())
+
+			pkcsreq, err := NewCSRRequest(csr, tmpl, WithCertsSelector(test.certsSelectorFunc), WithLogger(logger))
 			if test.shouldCreateCSR && err != nil {
 				t.Fatalf("keyUsage: %d, failed creating a CSR request: %v", test.keyUsage, err)
 			}
@@ -240,6 +293,12 @@ func TestNewCSRRequest(t *testing.T) {
 			if !test.shouldCreateCSR {
 				return
 			}
+
+			lines := newLines.Split(strings.TrimSpace(buf.String()), -1)
+			if len(lines) != 1 {
+				t.Errorf("expected single log line")
+			}
+			validateLogLevelDebug(t, lines)
 
 			msg := testParsePKIMessage(t, pkcsreq.Raw)
 			err = msg.DecryptPKIEnvelope(cacert, cakey)

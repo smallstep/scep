@@ -278,7 +278,12 @@ func TestNewCSRRequest(t *testing.T) {
 				SignerKey:   clientkey,
 			}
 
-			pkcsreq, err := NewCSRRequest(csr, tmpl, WithCertsSelector(test.certsSelectorFunc))
+			buf := bytes.Buffer{}
+			logger := log.NewLogfmtLogger(&buf)
+			logger = level.NewFilter(logger, level.AllowDebug())
+			logger = level.NewInjector(logger, level.DebugValue())
+
+			pkcsreq, err := NewCSRRequest(csr, tmpl, WithCertsSelector(test.certsSelectorFunc), WithLogger(logger))
 			if test.shouldCreateCSR && err != nil {
 				t.Fatalf("keyUsage: %d, failed creating a CSR request: %v", test.keyUsage, err)
 			}
@@ -288,6 +293,12 @@ func TestNewCSRRequest(t *testing.T) {
 			if !test.shouldCreateCSR {
 				return
 			}
+
+			lines := newLines.Split(strings.TrimSpace(buf.String()), -1)
+			if len(lines) != 1 {
+				t.Errorf("expected single log line")
+			}
+			validateLogLevelDebug(t, lines)
 
 			msg := testParsePKIMessage(t, pkcsreq.Raw)
 			err = msg.DecryptPKIEnvelope(cacert, cakey)

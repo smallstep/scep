@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"errors"
@@ -177,6 +178,7 @@ type PKIMessage struct {
 	SenderNonce
 	*CertRepMessage
 	*CSRReqMessage
+	*CertPollMessage
 
 	// DER Encoded PKIMessage
 	Raw []byte
@@ -219,6 +221,13 @@ type CSRReqMessage struct {
 	CSR *x509.CertificateRequest
 
 	ChallengePassword string
+}
+
+// CertPollMessage is a type of PKIMessage,
+type CertPollMessage struct {
+	Raw     asn1.RawContent
+	Issuer  pkix.RDNSequence
+	Subject pkix.RDNSequence
 }
 
 // ParsePKIMessage unmarshals a PKCS#7 signed data into a PKI message struct
@@ -318,7 +327,7 @@ func (msg *PKIMessage) parseMessageType() error {
 		}
 		msg.CertRepMessage = cr
 		return nil
-	case PKCSReq, UpdateReq, RenewalReq:
+	case PKCSReq, UpdateReq, RenewalReq, CertPoll:
 		var sn SenderNonce
 		if err := msg.p7.UnmarshalSignedAttribute(oidSCEPsenderNonce, &sn); err != nil {
 			return err
@@ -328,7 +337,7 @@ func (msg *PKIMessage) parseMessageType() error {
 		}
 		msg.SenderNonce = sn
 		return nil
-	case GetCRL, GetCert, CertPoll:
+	case GetCRL, GetCert:
 		return errNotImplemented
 	default:
 		return errUnknownMessageType
@@ -391,7 +400,17 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key crypto.Pri
 		}
 		logKeyVals = append(logKeyVals, "has_challenge", cp != "")
 		return nil
-	case GetCRL, GetCert, CertPoll:
+	case CertPoll:
+		var poll CertPollMessage
+		rest, err := asn1.Unmarshal(msg.pkiEnvelope, &poll)
+		if err != nil {
+			return fmt.Errorf("scep: unable to unmarshal certpoll message: %w", err)
+		} else if len(rest) != 0 {
+			return errors.New("scep: trailing data in certpoll message")
+		}
+		msg.CertPollMessage = &poll
+		return nil
+	case GetCRL, GetCert:
 		return errNotImplemented
 	default:
 		return errUnknownMessageType
@@ -461,10 +480,68 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth crypto.PrivateKey
 	return crepMsg, nil
 }
 
+// Pending returns a new PKIMessage with CertRep data indicating a pending state
+func (msg *PKIMessage) Pending(crtAuth *x509.Certificate, keyAuth crypto.PrivateKey) (*PKIMessage, error) {
+	config := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			{
+				Type:  oidSCEPtransactionID,
+				Value: msg.TransactionID,
+			},
+			{
+				Type:  oidSCEPpkiStatus,
+				Value: PENDING,
+			},
+			{
+				Type:  oidSCEPmessageType,
+				Value: CertRep,
+			},
+			{
+				Type:  oidSCEPsenderNonce,
+				Value: msg.SenderNonce,
+			},
+			{
+				Type:  oidSCEPrecipientNonce,
+				Value: msg.SenderNonce,
+			},
+		},
+	}
+
+	sd, err := pkcs7.NewSignedData(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// sign the attributes
+	if err := sd.AddSigner(crtAuth, keyAuth, config); err != nil {
+		return nil, err
+	}
+
+	certRepBytes, err := sd.Finish()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CertRepMessage{
+		PKIStatus:      PENDING,
+		RecipientNonce: RecipientNonce(msg.SenderNonce),
+	}
+
+	// create a CertRep message from the original
+	crepMsg := &PKIMessage{
+		Raw:            certRepBytes,
+		TransactionID:  msg.TransactionID,
+		MessageType:    CertRep,
+		CertRepMessage: cr,
+	}
+
+	return crepMsg, nil
+}
+
 // Success returns a new PKIMessage with CertRep data using an already-issued certificate
 func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth crypto.PrivateKey, crt *x509.Certificate) (*PKIMessage, error) {
 	// check if CSRReqMessage has already been decrypted
-	if msg.CSRReqMessage.CSR == nil { // TODO(hslatman): remove this; just require decryption before, so that we can make keyAuth a crypto.Signer
+	if msg.MessageType != CertPoll && msg.CSRReqMessage.CSR == nil { // TODO(hslatman): remove this; just require decryption before, so that we can make keyAuth a crypto.Signer
 		if err := msg.DecryptPKIEnvelope(crtAuth, keyAuth); err != nil {
 			return nil, err
 		}

@@ -26,4 +26,5 @@ jobs:
     with:
       run-build: false
       run-codeql: true
+      codeql-build-cmd: 'go build ./...'
     secrets: inherit

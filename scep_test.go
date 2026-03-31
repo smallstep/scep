@@ -157,7 +157,7 @@ func TestDecryptPKIEnvelopeCSR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if msg.CSRReqMessage.CSR == nil {
+	if msg.CSR == nil {
 		t.Errorf("expected non-nil CSR field")
 	}
 }
@@ -214,7 +214,7 @@ func TestSignCSR(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	csr := msg.CSRReqMessage.CSR
+	csr := msg.CSR
 	id, err := cryptoutil.GenerateSubjectKeyID(csr.PublicKey)
 	if err != nil {
 		t.Fatal(err)

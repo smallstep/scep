@@ -150,6 +150,15 @@ func WithCACerts(caCerts []*x509.Certificate) Option {
 	}
 }
 
+// WithUnsortedAuthenticatedAttributes controls whether verification compatibility
+// for legacy PKCS#7 implementations that sign authenticated attributes in their
+// encoded order instead of DER SET order is enabled.
+func WithUnsortedAuthenticatedAttributes(allow bool) Option {
+	return func(c *config) {
+		c.allowUnsortedAuthenticatedAttributes = allow
+	}
+}
+
 // WithCertsSelector adds the certificates certsSelector option to the SCEP
 // operations.
 // This option is effective when used with NewCSRRequest function. In
@@ -165,9 +174,10 @@ func WithCertsSelector(selector CertsSelector) Option {
 type Option func(*config)
 
 type config struct {
-	logger        Logger
-	caCerts       []*x509.Certificate // specified if CA certificates have already been retrieved
-	certsSelector CertsSelector
+	logger                               Logger
+	caCerts                              []*x509.Certificate // specified if CA certificates have already been retrieved
+	certsSelector                        CertsSelector
+	allowUnsortedAuthenticatedAttributes bool
 }
 
 // PKIMessage defines the possible SCEP message types
@@ -246,7 +256,9 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 		p7.Certificates = conf.caCerts
 	}
 
-	if err := p7.Verify(); err != nil {
+	if err := p7.VerifyWithOptions(pkcs7.VerifyOptions{
+		AllowUnsortedAuthenticatedAttributes: conf.allowUnsortedAuthenticatedAttributes,
+	}); err != nil {
 		return nil, err
 	}
 
@@ -674,3 +686,4 @@ func newTransactionID(key crypto.PublicKey) (TransactionID, error) {
 	encHash := base64.StdEncoding.EncodeToString(id)
 	return TransactionID(encHash), nil
 }
+

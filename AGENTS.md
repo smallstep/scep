@@ -29,7 +29,7 @@ go test -run TestParsePKIMessage -v .
 
 No build step, generated code, Docker, database, or environment variables are required. `go build ./...` and `go test ./...` work offline once modules are cached.
 
-Test fixtures under `testdata/` are real certificates with fixed validity windows. `TestSignCSR` signs with `testdata/testca/ca.crt` + `ca.key` (the key is password-protected; see the test for the password), and `pkcs7` rejects a signing time outside the signer certificate's validity, so this test starts failing once that certificate expires. If it fails with `signing time ... is outside of certificate validity`, the fixture needs regenerating rather than the code.
+Test fixtures under `testdata/` are real certificates with fixed validity windows; `testdata/testca/ca.crt` has already expired. `TestSignCSR` therefore does not use that certificate: `loadNewCACredentials` creates a fresh self-signed CA certificate at test time from `testdata/testca/ca.key` (password-protected; see the test for the password), because `pkcs7` rejects a signing time outside the signer certificate's validity. Prefer this approach for new tests that sign with the test CA.
 
 ## CI
 

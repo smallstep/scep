@@ -206,10 +206,30 @@ func TestDecryptPKIEnvelopeCert(t *testing.T) {
 }
 
 func TestSignCSR(t *testing.T) {
-	pkcsReq := readTestFile(t, "PKCSReq.der")
-	msg := testParsePKIMessage(t, pkcsReq)
-	cacert, cakey := loadCACredentials(t)
-	err := msg.DecryptPKIEnvelope(cacert, cakey)
+	key := newRSAKey(t, 3072)
+	derBytes := newCSR(t, key, "test@example.com", "US", "com.apple.2379B935-294B-4AF1-A213-9BD44A2C6688")
+	clientCSR, err := x509.ParseCertificateRequest(derBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientCert, clientKey := loadClientCredentials(t)
+
+	const caKeyUsage = x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment
+	caCert, caKey := createCaCertWithKeyUsage(t, caKeyUsage)
+
+	pkcsReq, err := scep.NewCSRRequest(clientCSR, &scep.PKIMessage{
+		MessageType: scep.PKCSReq,
+		Recipients:  []*x509.Certificate{caCert},
+		SignerCert:  clientCert,
+		SignerKey:   clientKey,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := testParsePKIMessage(t, pkcsReq.Raw)
+	err = msg.DecryptPKIEnvelope(caCert, caKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +242,7 @@ func TestSignCSR(t *testing.T) {
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(4),
 		Subject:      csr.Subject,
-		NotBefore:    time.Now().Add(-600).UTC(),
+		NotBefore:    time.Now().Add(-10 * time.Minute).UTC(),
 		NotAfter:     time.Now().AddDate(1, 0, 0).UTC(),
 		SubjectKeyId: id,
 		ExtKeyUsage: []x509.ExtKeyUsage{
@@ -230,8 +250,9 @@ func TestSignCSR(t *testing.T) {
 			x509.ExtKeyUsageClientAuth,
 		},
 	}
+
 	// sign the CSR creating a DER encoded cert
-	crtBytes, err := x509.CreateCertificate(rand.Reader, tmpl, cacert, csr.PublicKey, cakey)
+	crtBytes, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, csr.PublicKey, caKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +260,10 @@ func TestSignCSR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	certRep, err := msg.Success(cacert, cakey, crt)
+	if err := crt.CheckSignatureFrom(caCert); err != nil {
+		t.Fatal(err)
+	}
+	certRep, err := msg.Success(caCert, caKey, crt)
 	if err != nil {
 		t.Fatal(err)
 	}
